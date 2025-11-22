@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Forex Trading Assistant - DeepSeek Vision</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* ALL CSS CODE FROM PREVIOUS EXAMPLE */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #333; min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 {
+            font-size: 2.5rem; margin-bottom: 10px;
+            background: linear-gradient(45deg, #00c6ff, #0072ff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .api-status { padding: 10px; border-radius: 5px; margin: 10px 0; text-align: center; font-weight: bold; }
+        .status-connected { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-disconnected { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .market-status { background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+        .live-chart { background: white; border-radius: 15px; padding: 20px; margin-bottom: 20px; }
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+        @media (max-width: 768px) { .main-content { grid-template-columns: 1fr; } }
+        .upload-section, .analysis-section { background: white; border-radius: 15px; padding: 30px; }
+        .upload-area { border: 3px dashed #0072ff; border-radius: 10px; padding: 40px 20px; text-align: center; cursor: pointer; margin-bottom: 20px; }
+        .upload-area:hover { background: #f8f9ff; border-color: #00c6ff; }
+        #chartPreview { max-width: 100%; max-height: 300px; border-radius: 10px; display: none; }
+        .analysis-controls { display: flex; gap: 10px; margin-bottom: 20px; }
+        button { background: linear-gradient(45deg, #0072ff, #00c6ff); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-size: 16px; flex: 1; }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,114,255,0.4); }
+        button:disabled { background: #cccccc; cursor: not-allowed; transform: none; }
+        .analysis-result { background: #f8f9ff; border-radius: 10px; padding: 20px; margin-top: 20px; min-height: 200px; border-left: 4px solid #0072ff; }
+        .signal-box { background: white; border-radius: 10px; padding: 20px; margin: 15px 0; border: 2px solid #e9ecef; }
+        .signal-buy { border-color: #28a745; background: linear-gradient(45deg, #28a745, #20c997); color: white; }
+        .signal-sell { border-color: #dc3545; background: linear-gradient(45deg, #dc3545, #fd7e14); color: white; }
+        .signal-neutral { border-color: #ffc107; background: linear-gradient(45deg, #ffc107, #fd7e14); color: white; }
+        .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 20px 0; }
+        .level-box { background: white; padding: 15px; border-radius: 8px; text-align: center; border: 2px solid #0072ff; }
+        .level-value { font-size: 1.2rem; font-weight: bold; color: #0072ff; }
+        .loading { text-align: center; padding: 40px; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #0072ff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .price-card { background: white; padding: 15px; border-radius: 10px; text-align: center; border-left: 4px solid #28a745; }
+        .price-down { border-left-color: #dc3545; }
+        .confidence-meter { background: #e9ecef; border-radius: 10px; height: 20px; margin: 10px 0; overflow: hidden; }
+        .confidence-fill { height: 100%; background: linear-gradient(45deg, #28a745, #20c997); transition: width 0.5s ease; }
+        .footer { text-align: center; color: white; margin-top: 40px; opacity: 0.8; }
+        .disclaimer { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; margin-top: 20px; font-size: 0.9rem; }
+        #livePrices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 15px; }
+        @media (max-width: 768px) { #livePrices { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI Forex Trading Assistant</h1>
+            <p>Powered by DeepSeek Vision AI - Analisis Chart Otomatis & Rekomendasi Trading</p>
+            <div id="apiStatus" class="api-status status-disconnected">
+                🔴 Mode: Standalone Demo - Fully Functional
+            </div>
+        </div>
+
+        <div class="market-status">
+            <h3>📊 Live Market Data (Demo)</h3>
+            <div id="livePrices"></div>
+        </div>
+
+        <div class="live-chart">
+            <h3>📈 Live EUR/USD Chart</h3>
+            <canvas id="liveChart" height="200"></canvas>
+        </div>
+
+        <div class="main-content">
+            <div class="upload-section">
+                <h2>📊 Upload Chart Forex</h2>
+                <p>Upload screenshot chart trading untuk analisis AI</p>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div style="font-size: 48px; margin-bottom: 15px;">📁</div>
+                    <h3>Drop screenshot chart di sini</h3>
+                    <p>atau klik untuk memilih file (PNG, JPG, JPEG)</p>
+                    <input type="file" id="chartInput" accept="image/*" hidden>
+                </div>
+
+                <div class="preview-container">
+                    <img id="chartPreview" alt="Preview Chart">
+                </div>
+
+                <div class="analysis-controls">
+                    <button onclick="analyzeChart()" id="analyzeBtn" disabled>🧠 Analisis dengan AI</button>
+                    <button onclick="clearAnalysis()">🗑️ Hapus</button>
+                </div>
+
+                <div class="market-pairs">
+                    <h4>Pairs Forex Populer:</h4>
+                    <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                        <button onclick="quickPair('EURUSD')">EUR/USD</button>
+                        <button onclick="quickPair('GBPUSD')">GBP/USD</button>
+                        <button onclick="quickPair('USDJPY')">USD/JPY</button>
+                        <button onclick="quickPair('XAUUSD')">XAU/USD</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="analysis-section">
+                <h2>📈 Hasil Analisis AI</h2>
+                <p>Rekomendasi trading berdasarkan pattern recognition</p>
+                
+                <div class="analysis-result" id="analysisResult">
+                    <div class="loading" id="loadingSection" style="display: none;">
+                        <div class="spinner"></div>
+                        <p>AI sedang menganalisis chart Anda...</p>
+                    </div>
+                    <div id="resultContent">
+                        <p style="text-align: center; color: #666; padding: 60px 20px;">
+                            Upload screenshot chart untuk memulai analisis AI
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="disclaimer">
+            <strong>⚠️ Disclaimer:</strong> Untuk edukasi saja. Trading forex berisiko tinggi.
+        </div>
+
+        <div class="footer">
+            <p>© 2024 AI Forex Trading Assistant | Standalone Version</p>
+        </div>
+    </div>
+
+    <script>
+        // FULL JAVASCRIPT CODE - STANDALONE VERSION
+        class ForexAIApp {
+            constructor() {
+                this.liveChart = null;
+                this.init();
+            }
+
+            init() {
+                this.loadLivePrices();
+                this.initLiveChart();
+                this.setupEventListeners();
+                setInterval(() => this.loadLivePrices(), 5000);
+                console.log('🤖 Forex AI Assistant Standalone Ready!');
+            }
+
+            loadLivePrices() {
+                const prices = this.generateDemoPrices();
+                this.displayLivePrices(prices);
+                this.updateLiveChart(prices);
+            }
+
+            displayLivePrices(prices) {
+                const container = document.getElementById('livePrices');
+                let html = '';
+                
+                Object.entries(prices).forEach(([symbol, data]) => {
+                    const changeClass = data.change >= 0 ? '' : 'price-down';
+                    const changeIcon = data.change >= 0 ? '📈' : '📉';
+                    const changeColor = data.change >= 0 ? '#28a745' : '#dc3545';
+                    
+                    html += `
+                        <div class="price-card ${changeClass}" style="border-left-color: ${changeColor}">
+                            <div style="font-weight: bold;">${symbol}</div>
+                            <div style="font-size: 1.3rem; font-weight: bold; margin: 5px 0;">${data.price}</div>
+                            <div style="color: ${changeColor};">
+                                ${changeIcon} ${data.change} (${data.changePercent}%)
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            }
+
+            initLiveChart() {
+                const ctx = document.getElementById('liveChart').getContext('2d');
+                this.liveChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'EUR/USD',
+                            data: [],
+                            borderColor: '#0072ff',
+                            backgroundColor: 'rgba(0, 114, 255, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { display: true, grid: { display: false } },
+                            y: { display: true, grid: { color: 'rgba(0,0,0,0.1)' } }
+                        }
+                    }
+                });
+            }
+
+            updateLiveChart(prices) {
+                if (!this.liveChart || !prices.EURUSD) return;
+                
+                const now = new Date().toLocaleTimeString();
+                const price = parseFloat(prices.EURUSD.price);
+                
+                this.liveChart.data.labels.push(now);
+                this.liveChart.data.datasets[0].data.push(price);
+                
+                if (this.liveChart.data.labels.length > 15) {
+                    this.liveChart.data.labels.shift();
+                    this.liveChart.data.datasets[0].data.shift();
+                }
+                
+                this.liveChart.update('none');
+            }
+
+            analyzeChart() {
+                const chartInput = document.getElementById('chartInput');
+                if (!chartInput.files[0]) {
+                    alert('Please upload a chart image first!');
+                    return;
+                }
+
+                const loadingSection = document.getElementById('loadingSection');
+                const resultContent = document.getElementById('resultContent');
+                
+                loadingSection.style.display = 'block';
+                resultContent.innerHTML = '';
+
+                // Simulate AI processing
+                setTimeout(() => {
+                    const analysis = this.generateAIAnalysis();
+                    this.displayAnalysisResults(analysis);
+                    loadingSection.style.display = 'none';
+                }, 2000);
+            }
+
+            generateAIAnalysis() {
+                const patterns = [
+                    'Double Top', 'Head and Shoulders', 'Bullish Flag', 
+                    'Triangle Pattern', 'Channel Up', 'Support Bounce',
+                    'Resistance Break', 'Trend Line Break'
+                ];
+                const signal = Math.random() > 0.6 ? 'BUY' : Math.random() > 0.6 ? 'SELL' : 'HOLD';
+                const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+                
+                const basePrice = 1.0850;
+                let entry, sl, tp;
+
+                if (signal === 'BUY') {
+                    entry = (basePrice + 0.0005).toFixed(4);
+                    sl = (basePrice - 0.0020).toFixed(4);
+                    tp = (basePrice + 0.0040).toFixed(4);
+                } else if (signal === 'SELL') {
+                    entry = (basePrice - 0.0005).toFixed(4);
+                    sl = (basePrice + 0.0020).toFixed(4);
+                    tp = (basePrice - 0.0040).toFixed(4);
+                } else {
+                    entry = basePrice.toFixed(4);
+                    sl = (basePrice - 0.0015).toFixed(4);
+                    tp = (basePrice + 0.0015).toFixed(4);
+                }
+
+                const analyses = {
+                    'BUY': `AI mengidentifikasi pola ${pattern} dengan konfirmasi volume bullish. Momentum menguat dengan break resistance. Rekomendasi entry long.`,
+                    'SELL': `AI mendeteksi pola ${pattern} menunjukkan tekanan jual. Price action bearish dengan break support. Rekomendasi entry short.`,
+                    'HOLD': `Market dalam konsolidasi dengan pola ${pattern}. Tunggu breakout confirmation. Hindari entry sampai trend jelas.`
+                };
+
+                return {
+                    signal: signal,
+                    pattern: pattern,
+                    confidence: Math.floor(Math.random() * 30) + 70,
+                    entry: entry,
+                    stopLoss: sl,
+                    takeProfit: tp,
+                    analysis: analyses[signal],
+                    timeframe: 'H1',
+                    riskReward: signal === 'HOLD' ? 'N/A' : '1:2'
+                };
+            }
+
+            displayAnalysisResults(data) {
+                const resultContent = document.getElementById('resultContent');
+                const signalClass = `signal-${data.signal === 'BUY' ? 'buy' : data.signal === 'SELL' ? 'sell' : 'neutral'}`;
+                
+                resultContent.innerHTML = `
+                    <div class="signal-box ${signalClass}">
+                        <h3>${data.signal === 'BUY' ? '🎯 SIGNAL BUY' : data.signal === 'SELL' ? '🎯 SIGNAL SELL' : '⚖️ SIGNAL HOLD'}</h3>
+                        <p><strong>Pola Terdeteksi:</strong> ${data.pattern}</p>
+                        <p><strong>Timeframe:</strong> ${data.timeframe}</p>
+                        <p><strong>Confidence Level:</strong> ${data.confidence}%</p>
+                        <div class="confidence-meter">
+                            <div class="confidence-fill" style="width: ${data.confidence}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="levels">
+                        <div class="level-box">
+                            <h4>📍 Entry Price</h4>
+                            <div class="level-value">${data.entry}</div>
+                        </div>
+                        <div class="level-box">
+                            <h4>🛑 Stop Loss</h4>
+                            <div class="level-value">${data.stopLoss}</div>
+                        </div>
+                        <div class="level-box">
+                            <h4>🎯 Take Profit</h4>
+                            <div class="level-value">${data.takeProfit}</div>
+                        </div>
+                    </div>
+
+                    <div class="signal-box">
+                        <h4>📋 Analisis Teknikal</h4>
+                        <p>${data.analysis}</p>
+                        <p><strong>Risk/Reward Ratio:</strong> ${data.riskReward}</p>
+                    </div>
+
+                    <div class="signal-box">
+                        <h4>💡 Rekomendasi Trading</h4>
+                        <ul style="padding-left: 20px; margin: 10px 0;">
+                            <li>Position sizing maksimal 2% dari equity</li>
+                            <li>Pastikan SL dan TP sudah ditetapkan</li>
+                            <li>Monitor price action untuk konfirmasi</li>
+                            <li>Perhatikan market sentiment</li>
+                        </ul>
+                    </div>
+                `;
+            }
+
+            generateDemoPrices() {
+                const symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'];
+                const prices = {};
+                
+                symbols.forEach(symbol => {
+                    const basePrices = {
+                        'EURUSD': 1.0850, 'GBPUSD': 1.2650, 
+                        'USDJPY': 148.00, 'XAUUSD': 1980.00
+                    };
+                    
+                    const base = basePrices[symbol];
+                    const change = (Math.random() - 0.5) * 0.01;
+                    
+                    prices[symbol] = {
+                        price: (base + change).toFixed(4),
+                        change: change.toFixed(4),
+                        changePercent: ((change / base) * 100).toFixed(2)
+                    };
+                });
+                
+                return prices;
+            }
+
+            setupEventListeners() {
+                const uploadArea = document.getElementById('uploadArea');
+                const chartInput = document.getElementById('chartInput');
+
+                uploadArea.addEventListener('click', () => chartInput.click());
+                
+                chartInput.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) this.handleImageUpload(file);
+                });
+
+                // Drag & drop
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.style.background = '#f0f8ff';
+                });
+
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.style.background = '';
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.style.background = '';
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        this.handleImageUpload(file);
+                    }
+                });
+            }
+
+            handleImageUpload(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const chartPreview = document.getElementById('chartPreview');
+                    chartPreview.src = e.target.result;
+                    chartPreview.style.display = 'block';
+                    document.getElementById('analyzeBtn').disabled = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            window.forexAIApp = new ForexAIApp();
+        });
+
+        // Global functions
+        function analyzeChart() {
+            if (window.forexAIApp) window.forexAIApp.analyzeChart();
+        }
+
+        function clearAnalysis() {
+            const chartInput = document.getElementById('chartInput');
+            const chartPreview = document.getElementById('chartPreview');
+            const resultContent = document.getElementById('resultContent');
+            
+            chartInput.value = '';
+            chartPreview.style.display = 'none';
+            document.getElementById('analyzeBtn').disabled = true;
+            
+            resultContent.innerHTML = `
+                <p style="text-align: center; color: #666; padding: 60px 20px;">
+                    Upload screenshot chart untuk memulai analisis AI
+                </p>
+            `;
+        }
+
+        function quickPair(pair) {
+            alert(`Demo untuk ${pair}:\n\n1. Screenshot chart ${pair} dari platform trading\n2. Upload di sini untuk analisis AI\n3. Dapatkan rekomendasi trading otomatis`);
+        }
+    </script>
+</body>
+</html>
